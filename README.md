@@ -1,55 +1,68 @@
 # Google Sheets MCP Server
 
-A custom MCP (Model Context Protocol) server that allows Claude to write rows to Google Sheets.
+A custom MCP (Model Context Protocol) server that enables Claude to read, write, update, and delete data in any Google Sheet. Works with any spreadsheet for any use case.
 
 ## Features
 
-- **append_rows**: Append one or more rows to any Google Sheet you specify by name or ID
-- Sheet name resolution: Can reference sheets by exact name or spreadsheet ID
-- Flexible row format: Accepts rows as arrays or objects (with keys as column headers)
-- Automatic tab validation: Verifies the tab exists and lists available tabs on error
+- **`append_rows`** — Add one or more rows to any Google Sheet
+- **`update_row`** — Update existing cells by matching a column value
+- **`delete_row`** — Delete rows by matching a column value
+- **Sheet/tab flexibility** — Reference sheets by name or spreadsheet ID
+- **Flexible row format** — Supports arrays or objects (with column headers)
+- **Automatic validation** — Verifies sheets and tabs exist, with helpful error messages
+- **Service account auth** — Uses Google Cloud credentials for secure access
+
+## Use Cases
+
+- Job application tracking
+- Project management and status updates
+- Inventory or asset management
+- Lead tracking and CRM operations
+- Data collection and processing
+- Automated report generation
+- Any custom workflow that needs Google Sheets integration
 
 ## Prerequisites
 
 - Node.js installed
 - Google Cloud project with Sheets API and Drive API enabled
-- Service account created and `credentials.json` in the project root
+- Service account created with `credentials.json` in the project directory
 - Target Google Sheet shared with the service account email address
 
 ## Setup
 
-Dependencies are already installed via npm install. To verify:
+1. Install dependencies:
+```bash
+npm install
+```
 
+2. Verify the required packages:
 ```bash
 npm list @modelcontextprotocol/sdk googleapis google-auth-library
 ```
 
+3. Ensure `credentials.json` is in the same directory as `index.js`
+
 ## How It Works
 
-1. **Authentication**: Uses service account credentials from `credentials.json` to authenticate with Google APIs
-2. **Sheet Lookup**: If given a sheet name, resolves it to the sheet ID via Google Drive API
-3. **Tab Validation**: Finds the specified tab in the sheet and returns an error with available tabs if not found
-4. **Row Append**: Converts rows to values and appends them using the Sheets API `append()` method
+1. **Authentication** — Uses service account credentials from `credentials.json`
+2. **Sheet Resolution** — Converts sheet names to IDs via Google Drive API
+3. **Tab Validation** — Verifies the specified tab exists
+4. **Data Operations** — Appends, updates, or deletes rows using the Sheets API
 
 ## Registering with Claude Code
 
-Once the server is running, register it with Claude Code using:
-
-```bash
-claude code register "Google Sheets" --command "node /Users/daniellacortez/dev/index.js"
-```
-
-Or, add it to your Claude Code settings directly:
+Add this MCP to your Claude Code settings:
 
 1. Open `.claude/settings.json` in your home directory
-2. Add the MCP server to the `mcpServers` array:
+2. Add to the `mcpServers` array:
 
 ```json
 {
   "mcpServers": {
     "google-sheets": {
       "command": "node",
-      "args": ["/Users/daniellacortez/dev/index.js"]
+      "args": ["/path/to/google-sheets-mcp/index.js"]
     }
   }
 }
@@ -57,54 +70,144 @@ Or, add it to your Claude Code settings directly:
 
 3. Restart Claude Code
 
-## Using the Tool
+## Tools
 
-Once registered, Claude can call the `append_rows` tool. Examples:
+### 1. `append_rows` — Add new rows
 
-### Append a single row as an array:
+Append one or more rows to any sheet.
 
-```
-Append to my "Job Tracker" sheet, tab "Applications", this row: ["Google", "2026-05-25", "Applied", "software_engineer@google.com"]
-```
+**Parameters:**
+- `sheet_name_or_id` (required) — Sheet name or ID
+- `tab_name` (optional) — Tab name, defaults to "Sheet1"
+- `rows` (required) — Array of rows (arrays or objects)
 
-### Append rows as objects (with column headers):
-
-```
-Add these applications to my job tracker sheet:
-- Company: LinkedIn, Date: 2026-05-24, Status: Interview Scheduled
-- Company: Microsoft, Date: 2026-05-20, Status: Rejected
-```
-
-The tool will convert these to the appropriate format and append them.
-
-### Use a sheet ID instead of name:
-
-If you have the sheet ID from the URL (the long alphanumeric string), you can use it directly:
+**Examples:**
 
 ```
-Append to sheet "1a2b3c4d5e6f7g8h9i0j", tab "Data"...
+"Add this row to my 'Project Tracker' sheet: ['Task Name', 'Status', 'Owner']"
 ```
 
-## Tool Parameters
+```
+"Append to my inventory sheet:
+- Item: Widget, Quantity: 50, Location: Warehouse A
+- Item: Gadget, Quantity: 25, Location: Warehouse B"
+```
 
-- **sheet_name_or_id** (required): The exact name of the Google Sheet or its spreadsheet ID
-- **tab_name** (optional): The name of the worksheet tab. Defaults to "Sheet1"
-- **rows** (required): An array of rows, each row can be:
-  - An array of values: `[["value1", "value2", "value3"]]`
-  - An object with column headers: `[{"Company": "Google", "Date": "2026-05-25", "Status": "Applied"}]`
+### 2. `update_row` — Update existing cells
+
+Update a cell by finding the row that matches a column value.
+
+**Parameters:**
+- `sheet_name_or_id` (required) — Sheet name or ID
+- `tab_name` (optional) — Tab name, defaults to "Sheet1"
+- `match_column` (required) — Column to search in (e.g., "Name")
+- `match_value` (required) — Value to match (e.g., "John")
+- `update_column` (required) — Column to update (e.g., "Status")
+- `new_value` (required) — New value to write
+
+**Examples:**
+
+```
+"Update the Status to 'Completed' for the row where Task is 'Setup Database'"
+```
+
+```
+"For the item named 'Widget' in inventory, change the Quantity to 100"
+```
+
+### 3. `delete_row` — Remove rows
+
+Delete a row by finding it with a column value match.
+
+**Parameters:**
+- `sheet_name_or_id` (required) — Sheet name or ID
+- `tab_name` (optional) — Tab name, defaults to "Sheet1"
+- `match_column` (required) — Column to search in
+- `match_value` (required) — Value to match
+
+**Examples:**
+
+```
+"Delete the row where Company is 'Acme Corp' from my leads sheet"
+```
+
+```
+"Remove the task named 'Old Project' from my project tracker"
+```
+
+## Row Formats
+
+### Array format:
+```
+[["value1", "value2", "value3"]]
+```
+
+### Object format (with column headers):
+```
+[{"Name": "John", "Email": "john@example.com", "Status": "Active"}]
+```
+
+## Referencing Sheets
+
+**By name (exact match):**
+```
+"Update my 'Sales Pipeline' sheet"
+```
+
+**By ID (from URL):**
+```
+"Append to sheet '1a2b3c4d5e6f7g8h9i0j'"
+```
 
 ## Troubleshooting
 
-**"Sheet not found"**: Make sure you're using the exact sheet name and that the service account has access to it.
+| Error | Solution |
+|-------|----------|
+| "Sheet not found" | Use the exact sheet name or verify the service account has access |
+| "Tab not found" | Error message lists available tabs — use the exact tab name |
+| "Permission denied" | Share the sheet with the service account email from `credentials.json` |
+| "Invalid credentials" | Verify `credentials.json` exists and contains valid service account credentials |
+| "Column not found" | Check the exact spelling of the column name |
 
-**"Tab not found"**: The error message will list all available tabs in the sheet. Use the exact tab name.
+## Configuration
 
-**"Permission denied"**: Ensure the sheet is shared with the service account email address from your `credentials.json`.
+The service account email and project ID are read from `credentials.json`. To use this MCP with a different Google account:
 
-**"Invalid credentials"**: Verify `credentials.json` exists and contains valid service account credentials.
+1. Generate a new service account in Google Cloud Console
+2. Download the JSON key file
+3. Replace `credentials.json` with the new file
+4. Share your Google Sheets with the new service account email
 
-## Next Steps
+## Example Workflows
 
-- Integrate with Claude's email reading capabilities to auto-populate your job tracker from application confirmations
-- Add more tools (e.g., `read_sheet`, `update_rows`, `delete_rows`)
-- Add formatting options (bold, colors, etc.) for better sheet organization
+**Job Application Tracker:**
+```
+Append a new application: Google, Applied, 2026-05-25
+Update status to "Interview Scheduled" for Google
+```
+
+**Project Management:**
+```
+Add task: "Design Database", "In Progress", "Alice"
+Update the status of "Design Database" to "Complete"
+Delete the "Deprecated Feature" task
+```
+
+**Inventory Management:**
+```
+Add new item: Widget, 50 units, Warehouse A
+Update quantity for Widget to 40
+Remove discontinued items
+```
+
+## Extending the MCP
+
+The server can be extended with additional tools:
+- `read_sheet` — Fetch sheet data
+- `batch_update` — Update multiple cells
+- `format_cells` — Apply formatting (bold, colors, etc.)
+- `create_chart` — Generate charts from data
+
+## License
+
+MIT
